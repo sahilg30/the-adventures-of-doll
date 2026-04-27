@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>✨ Magical Love World ✨</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        #gw {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #120026;
+        }
+
+        #gc {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #pop {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(135deg, rgba(255, 240, 252, 0.97), rgba(240, 232, 255, 0.97));
+            padding: 26px 28px 22px;
+            max-width: 80%;
+            max-height: 80vh;
+            overflow-y: auto;
+            z-index: 20;
+            text-align: center;
+            border: 1.5px solid rgba(230, 180, 255, 0.8);
+            box-shadow: 0 0 60px rgba(200, 100, 255, 0.3);
+        }
+
+        #pclose {
+            position: absolute;
+            top: 10px;
+            right: 14px;
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #a855f7;
+            line-height: 1;
+        }
+
+        #ptitle {
+            font-size: 19px;
+            color: #7e22ce;
+            margin-bottom: 10px;
+            font-family: Georgia, serif;
+            font-weight: bold;
+        }
+
+        #ptext {
+            font-size: 13.5px;
+            color: #3b0764;
+            line-height: 1.75;
+            margin-bottom: 14px;
+            font-family: Georgia, serif;
+            white-space: pre-line;
+        }
+
+        #phint {
+            font-size: 12.5px;
+            color: #6d28d9;
+            font-style: italic;
+            padding: 9px 12px;
+            background: rgba(216, 180, 254, 0.25);
+            text-align: center;
+            font-family: Georgia, serif;
+        }
+
+        #hud {
+            position: fixed;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.25);
+            padding: 6px 14px;
+        }
+
+        .gem {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            border: 1.5px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.1);
+            transition: all 0.4s;
+        }
+
+        .gem.found {
+            box-shadow: 0 0 10px currentColor;
+        }
+
+        #tip {
+            position: fixed;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.45);
+            font-family: sans-serif;
+            pointer-events: none;
+            white-space: nowrap;
+            z-index: 5;
+            text-align: center;
+            max-width: 90vw;
+        }
+    </style>
+</head>
+<body>
+    <div id="gw">
+        <canvas id="gc"></canvas>
+        <div id="hud">
+            <div class="gem" id="g0" style="color:#FFB7C5" title="Flower"></div>
+            <div class="gem" id="g1" style="color:#FFE566" title="Star"></div>
+            <div class="gem" id="g2" style="color:#FFA652" title="Lantern"></div>
+            <div class="gem" id="g3" style="color:#C084FC" title="Mushroom"></div>
+            <div class="gem" id="g4" style="color:#FF6B8A" title="Heart"></div>
+        </div>
+        <div id="pop">
+            <button id="pclose">✕</button>
+            <div id="ptitle"></div>
+            <div id="ptext"></div>
+            <div id="phint"></div>
+        </div>
+        <div id="tip">Arrow keys / WASD to walk • Click to move • Approach glowing objects & press Enter</div>
+    </div>
+
+    <script>
+        const wrap = document.getElementById('gw');
+        const canvas = document.getElementById('gc');
+        const ctx = canvas.getContext('2d');
+
+        let W = window.innerWidth, H = window.innerHeight;
+
+        function resizeCanvas() {
+            W = window.innerWidth;
+            H = window.innerHeight;
+            canvas.width = W;
+            canvas.height = H;
+        }
+
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        let t = 0, popOpen = false;
+
+        if (!CanvasRenderingContext2D.prototype.roundRect) {
+            CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+                this.beginPath(); this.moveTo(x + r, y); this.lineTo(x + w - r, y);
+                this.quadraticCurveTo(x + w, y, x + w, y + r); this.lineTo(x + w, y + h - r);
+                this.quadraticCurveTo(x + w, y + h, x + w - r, y + h); this.lineTo(x + r, y + h);
+                this.quadraticCurveTo(x, y + h, x, y + h - r); this.lineTo(x, y + r);
+                this.quadraticCurveTo(x, y, x + r, y); this.closePath();
+            };
+        }
+
+        const girl = { x: 0, y: 0, vx: 0, vy: 0, facing: 1, af: 0, idle: 0 };
+        const target = { x: null, y: null };
+        const keys = {};
+
+        const msgs = [
+            { emoji: '🌸', title: 'A Little Note', text: 'My love... I left this tiny flower here because it made me think of you — gentle, beautiful, and full of quiet magic.\n\nI want you to know that loving you is the most wonderful thing in my life. You make every ordinary moment sparkle. I love you so, so much.', hint: '✨ A golden star twinkles high up to the right... find it and hear what it has to say.' },
+            { emoji: '⭐', title: 'Written in the Stars', text: 'Every night when I look up, I see your name written in the stars.\n\nI love the way you laugh — really laugh — until your eyes crinkle. I love how deeply you care about everything. I love how you make the world feel warmer just by being in it. You are, without question, my favorite person.', hint: '🏮 A warm lantern glows in the center of this world... its light is waiting for you.' },
+            { emoji: '🏮', title: 'I\'m Sorry, My Love', text: 'I\'ve been carrying something in my heart for a while...\n\nI\'m sorry for the time I haven\'t given you. For evenings I was distracted. For moments I could have chosen you — and didn\'t. You deserve someone who is fully present, and I haven\'t always been that. I\'m truly, deeply sorry.', hint: '🍄 Something magical grows in the lower right — a glowing mushroom holds the next message.' },
+            { emoji: '🍄', title: 'A Promise, From Me to You', text: 'Starting now, I choose you — again and again, every single day.\n\nMore evenings side by side. More silly adventures. More long talks and shared silences. More of everything that makes us *us*. This isn\'t just a wish — it\'s a promise I intend to keep, one day at a time, for as long as you\'ll have me.', hint: '💎 You\'re almost at the end... a crystal heart glows softly up to the left. It\'s been waiting just for you.' },
+            { emoji: '💕', title: 'My Whole Heart', text: 'You found them all. And now you\'ve found this — the truest thing I could ever say:\n\nYou are my home. My favorite adventure. My reason to want to be better every single day.\n\nI love you with everything I am, and I will spend every day from here proving it.\n\nThank you for being you. Thank you for choosing me.\n\nForever and always yours. 💕', hint: '' }
+        ];
+
+        let objs = [];
+        let bgStars = [];
+        let clouds = [];
+        let floatParts = [];
+
+        function initWorld() {
+            girl.x = W / 2; girl.y = H * 0.69;
+            objs = [
+                { x: W * 0.17, y: H * 0.80, type: 'flower', c: '#FFB7C5', gc: '#ff80ab', mi: 0, found: false, locked: false },
+                { x: W * 0.83, y: H * 0.18, type: 'star', c: '#FFE566', gc: '#ffd700', mi: 1, found: false, locked: false },
+                { x: W * 0.5, y: H * 0.49, type: 'lantern', c: '#FFA652', gc: '#ff7700', mi: 2, found: false, locked: false },
+                { x: W * 0.87, y: H * 0.78, type: 'mushroom', c: '#C084FC', gc: '#9333ea', mi: 3, found: false, locked: false },
+                { x: W * 0.13, y: H * 0.28, type: 'heart', c: '#FF6B8A', gc: '#ff1493', mi: 4, found: false, locked: true }
+            ];
+            bgStars = Array.from({ length: 80 }, () => ({ x: Math.random() * W, y: Math.random() * H * 0.72, sz: 0.4 + Math.random() * 2.2, tw: Math.random() * Math.PI * 2 }));
+            clouds = [{ x: W * 0.088, y: H * 0.105, w: W * 0.191, h: H * 0.092 }, { x: W * 0.426, y: H * 0.067, w: W * 0.162, h: H * 0.081 }, { x: W * 0.75, y: H * 0.125, w: W * 0.22, h: H * 0.1 }, { x: W * 0.235, y: H * 0.202, w: W * 0.14, h: H * 0.073 }];
+            floatParts = Array.from({ length: 35 }, () => ({ x: Math.random() * W, y: Math.random() * H, vx: (Math.random() - .5) * .4, vy: -.15 - .3 * Math.random(), life: .3 + Math.random() * .7, sz: .8 + Math.random() * 2, col: ['#fce7f3', '#e9d5ff', '#bfdbfe', '#fef9c3'][Math.floor(Math.random() * 4)] }));
+        }
+
+        initWorld();
+        const sparks = [];
+
+        function spawnSparks(x, y, col, n = 12) {
+            for (let i = 0; i < n; i++) {
+                const a = Math.random() * Math.PI * 2, sp = 1 + Math.random() * 3;
+                sparks.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 1, decay: 0.015 + Math.random() * 0.02, sz: 1.5 + Math.random() * 4, col });
+            }
+        }
+
+        function scaleCoords(cx, cy) {
+            const r = canvas.getBoundingClientRect();
+            return { x: (cx - r.left) * (W / r.width), y: (cy - r.top) * (H / r.height) };
+        }
+
+        canvas.addEventListener('click', e => {
+            if (popOpen) return;
+            const { x: mx, y: my } = scaleCoords(e.clientX, e.clientY);
+            for (const o of objs) {
+                if (o.locked) continue;
+                const gd = Math.hypot(girl.x - o.x, girl.y - o.y);
+                if (gd < H * 0.18) {
+                    const od = Math.hypot(mx - o.x, my - o.y);
+                    if (od < H * 0.1) { openPop(o); return; }
+                }
+            }
+            target.x = mx; target.y = Math.min(my, H - H * 0.1);
+        });
+
+        canvas.addEventListener('touchstart', e => { e.preventDefault(); const t2 = e.touches[0]; const { x, y } = scaleCoords(t2.clientX, t2.clientY); target.x = x; target.y = Math.min(y, H - H * 0.1); }, { passive: false });
+        canvas.addEventListener('touchmove', e => { e.preventDefault(); const t2 = e.touches[0]; const { x, y } = scaleCoords(t2.clientX, t2.clientY); target.x = x; target.y = Math.min(y, H - H * 0.1); }, { passive: false });
+
+        window.addEventListener('keydown', e => {
+            keys[e.key] = true;
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) e.preventDefault();
+            if ((e.key === 'Enter' || e.key === ' ') && !popOpen) {
+                for (const o of objs) { if (o.locked) continue; if (Math.hypot(girl.x - o.x, girl.y - o.y) < H * 0.18) { openPop(o); break; } }
+            }
+            if (e.key === 'Escape' && popOpen) closePop();
+        });
+
+        window.addEventListener('keyup', e => keys[e.key] = false);
+        document.getElementById('pclose').addEventListener('click', closePop);
+
+        function openPop(o) {
+            if (popOpen) return; popOpen = true;
+            if (!o.found) {
+                o.found = true;
+                spawnSparks(o.x, o.y, o.gc, 16);
+                spawnSparks(o.x, o.y, '#fff', 8);
+                const gem = document.getElementById('g' + o.mi);
+                gem.classList.add('found');
+                gem.style.background = o.gc;
+                if (objs.slice(0, 4).every(x => x.found)) objs[4].locked = false;
+            }
+            const m = msgs[o.mi];
+            document.getElementById('ptitle').textContent = m.emoji + ' ' + m.title;
+            document.getElementById('ptext').textContent = m.text;
+            const ph = document.getElementById('phint');
+            ph.textContent = m.hint; ph.style.display = m.hint ? 'block' : 'none';
+            document.getElementById('pop').style.display = 'block';
+        }
+
+        function closePop() { document.getElementById('pop').style.display = 'none'; popOpen = false; }
+
+        function drawBg() {
+            const sky = ctx.createLinearGradient(0, 0, 0, H * .75);
+            sky.addColorStop(0, '#0d001f'); sky.addColorStop(.35, '#1e0040'); sky.addColorStop(.65, '#4a0080'); sky.addColorStop(1, '#7c3aed');
+            ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H * .75);
+            const gnd = ctx.createLinearGradient(0, H * .68, 0, H);
+            gnd.addColorStop(0, '#22c55e'); gnd.addColorStop(.4, '#15803d'); gnd.addColorStop(1, '#052e16');
+            ctx.fillStyle = gnd; ctx.fillRect(0, H * .68, W, H * .32);
+            for (const s of bgStars) {
+                const a = .4 + .6 * Math.sin(t * .025 + s.tw);
+                ctx.fillStyle = `rgba(255,255,255,${a})`;
+                ctx.beginPath(); ctx.arc(s.x, s.y, s.sz, 0, Math.PI * 2); ctx.fill();
+            }
+            ctx.fillStyle = 'rgba(255,180,240,0.08)';
+            for (const c of clouds) {
+                ctx.beginPath(); ctx.ellipse(c.x, c.y, c.w / 2, c.h / 2, 0, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.ellipse(c.x + c.w * .22, c.y - c.h * .3, c.w * .28, c.h * .38, 0, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.ellipse(c.x - c.w * .18, c.y - c.h * .2, c.w * .22, c.h * .3, 0, 0, Math.PI * 2); ctx.fill();
+            }
+        }
+
+        function drawFloatParts() {
+            for (const p of floatParts) {
+                p.x += p.vx; p.y += p.vy; p.life -= .0025;
+                if (p.life <= 0 || p.y < 0) { p.x = Math.random() * W; p.y = H; p.life = .4 + Math.random() * .6; }
+                ctx.save(); ctx.globalAlpha = p.life * .55; ctx.fillStyle = p.col; ctx.shadowColor = p.col; ctx.shadowBlur = 5;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.sz, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+            }
+        }
+
+        function glow(col, amt) { ctx.shadowColor = col; ctx.shadowBlur = 22 * amt; }
+
+        function drawFlower(x, y, col, ga) {
+            const s = 1 + ga * .28, yb = y + Math.sin(t * .022) * 4;
+            ctx.save(); ctx.translate(x, yb); ctx.scale(s, s);
+            if (ga > .01) glow(col, ga);
+            ctx.strokeStyle = '#4ade80'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, 28); ctx.stroke();
+            for (let i = 0; i < 6; i++) {
+                ctx.save(); ctx.rotate((i / 6) * Math.PI * 2 + t * .012);
+                ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(0, -15, 6, 11, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+            }
+            ctx.fillStyle = '#fef08a'; ctx.beginPath(); ctx.arc(0, 0, 9, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#fbbf24'; ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.fill();
+            ctx.restore();
+        }
+
+        function drawStar(x, y, col, ga) {
+            const yb = y + Math.sin(t * .03) * 7, s = 1 + ga * .28;
+            ctx.save(); ctx.translate(x, yb); ctx.scale(s, s); ctx.rotate(t * .018);
+            if (ga > .01) glow(col, ga);
+            ctx.fillStyle = col; ctx.beginPath();
+            for (let i = 0; i < 10; i++) { const r = i % 2 === 0 ? 20 : 8, a = (i / 10) * Math.PI * 2 - Math.PI / 2; i === 0 ? ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r) : ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
+            ctx.closePath(); ctx.fill();
+            ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.beginPath(); ctx.arc(-4, -4, 5, 0, Math.PI * 2); ctx.fill();
+            ctx.restore();
+        }
+
+        function drawLantern(x, y, col, ga) {
+            const yb = y + Math.sin(t * .025) * 9;
+            ctx.save(); ctx.translate(x, yb);
+            ctx.strokeStyle = 'rgba(255,255,255,.3)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, -35); ctx.lineTo(0, -22); ctx.stroke();
+            if (ga > .01) glow(col, ga);
+            ctx.fillStyle = '#92400e'; ctx.beginPath(); ctx.roundRect(-13, -26, 26, 8, 3); ctx.fill();
+            ctx.fillStyle = col; ctx.beginPath(); ctx.roundRect(-11, -18, 22, 30, 5); ctx.fill();
+            ctx.fillStyle = `rgba(255,255,200,${.3 + ga * .5})`; ctx.beginPath(); ctx.ellipse(0, -3, 7, 10, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,.15)'; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(-11, -8); ctx.lineTo(11, -8); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(-11, 3); ctx.lineTo(11, 3); ctx.stroke();
+            ctx.fillStyle = '#92400e'; ctx.beginPath(); ctx.roundRect(-13, 12, 26, 7, 3); ctx.fill();
+            ctx.restore();
+        }
+
+        function drawMushroom(x, y, col, ga) {
+            const s = 1 + ga * .2;
+            ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+            if (ga > .01) glow(col, ga);
+            ctx.fillStyle = '#fef9c3'; ctx.beginPath(); ctx.ellipse(0, 12, 9, 15, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = col; ctx.beginPath(); ctx.arc(0, -4, 22, Math.PI, 0); ctx.closePath(); ctx.fill();
+            ctx.fillStyle = 'rgba(255,255,255,.65)';
+            [[0, -16], [-9, -8], [9, -8], [-14, -1], [14, -1]].forEach(([dx, dy]) => { ctx.beginPath(); ctx.arc(dx, dy, 3.2, 0, Math.PI * 2); ctx.fill(); });
+            ctx.restore();
+        }
+
+        function drawHeart(x, y, col, ga, locked) {
+            const pulse = 1 + Math.sin(t * .05) * .06 + ga * .22, yb = y + Math.sin(t * .028) * 6;
+            ctx.save(); ctx.translate(x, yb); ctx.scale(pulse, pulse);
+            if (locked) { ctx.globalAlpha = .3; ctx.fillStyle = '#a78bfa'; }
+            else { if (ga > .01) glow(col, ga); ctx.fillStyle = col; }
+            ctx.beginPath(); ctx.moveTo(0, 6);
+            ctx.bezierCurveTo(-2, -2, -18, -14, -18, -4); ctx.bezierCurveTo(-18, 6, -8, 17, 0, 26);
+            ctx.bezierCurveTo(8, 17, 18, 6, 18, -4); ctx.bezierCurveTo(18, -14, 2, -2, 0, 6);
+            ctx.fill();
+            if (!locked) {
+                ctx.fillStyle = 'rgba(255,255,255,.3)'; ctx.beginPath(); ctx.ellipse(-5, -4, 5, 7, -.4, 0, Math.PI * 2); ctx.fill();
+            } else {
+                ctx.globalAlpha = .6; ctx.fillStyle = 'white'; ctx.font = '13px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('?', 0, -30);
+            }
+            ctx.restore();
+        }
+
+        function drawObj(o) {
+            const dist = Math.hypot(girl.x - o.x, girl.y - o.y);
+            const ga = Math.max(0, 1 - dist / (H * 0.17));
+            if (ga > .25 && !popOpen && !o.locked) {
+                ctx.save(); ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.font = Math.round(H * 0.022) + 'px sans-serif'; ctx.textAlign = 'center';
+                ctx.fillText('✨ Click or press Enter', o.x, o.y - H * 0.09); ctx.restore();
+            }
+            switch (o.type) {
+                case 'flower': drawFlower(o.x, o.y, o.c, ga); break;
+                case 'star': drawStar(o.x, o.y, o.c, ga); break;
+                case 'lantern': drawLantern(o.x, o.y, o.c, ga); break;
+                case 'mushroom': drawMushroom(o.x, o.y, o.c, ga); break;
+                case 'heart': drawHeart(o.x, o.y, o.c, ga, o.locked); break;
+            }
+            if (o.found && Math.random() < .06) spawnSparks(o.x + (Math.random() - .5) * 28, o.y + (Math.random() - .5) * 28, o.gc, 1);
+        }
+
+        function drawGirl(x, y, f, af, idle) {
+            const bob = Math.sin(af * .28) * 2.5, leg = Math.sin(af * .28) * 9;
+            const breathing = Math.sin(idle * .04) * 1.5;
+            ctx.save(); ctx.translate(x, y + bob + breathing * .3); ctx.scale(f, 1);
+            ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(0, 30, 13, 4, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#fde68a';
+            ctx.beginPath(); ctx.roundRect(-8, 13, 7, 15 + leg, 3); ctx.fill();
+            ctx.beginPath(); ctx.roundRect(1, 13, 7, 15 - leg, 3); ctx.fill();
+            ctx.fillStyle = '#f9a8d4';
+            ctx.beginPath(); ctx.roundRect(-9, 5, 18, 12, 4); ctx.fill();
+            ctx.beginPath(); ctx.moveTo(-11, 11); ctx.lineTo(-14, 30); ctx.lineTo(14, 30); ctx.lineTo(11, 11); ctx.closePath(); ctx.fill();
+            ctx.fillStyle = '#fde68a';
+            const aw = Math.sin(af * .28) * 14;
+            ctx.save(); ctx.translate(-9, 7); ctx.rotate((-18 + aw) * Math.PI / 180); ctx.beginPath(); ctx.roundRect(-3, 0, 6, 13, 3); ctx.fill(); ctx.restore();
+            ctx.save(); ctx.translate(9, 7); ctx.rotate((18 - aw) * Math.PI / 180); ctx.beginPath(); ctx.roundRect(-3, 0, 6, 13, 3); ctx.fill(); ctx.restore();
+            ctx.fillStyle = '#fde68a'; ctx.beginPath(); ctx.roundRect(-4, -4, 8, 8, 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(0, -16, 14, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#78350f';
+            ctx.beginPath(); ctx.arc(0, -18, 14, Math.PI, 0); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(-11, -14, 5, 8, -.3, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(11, -14, 5, 8, .3, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(-3, -30, 9, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#a16207'; ctx.beginPath(); ctx.arc(4, -33, 5, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = 'rgba(255,182,193,.5)';
+            ctx.beginPath(); ctx.ellipse(-2, -33, 4, 3.5, -.3, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#1c1917'; ctx.beginPath(); ctx.arc(-5, -16, 2.5, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(5, -16, 2.5, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(-4, -17, 1, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(6, -17, 1, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = 'rgba(255,130,130,.4)';
+            ctx.beginPath(); ctx.ellipse(-7, -12, 5, 2.5, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(7, -12, 5, 2.5, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = '#92400e'; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.arc(0, -11, 4, .2, Math.PI - .2); ctx.stroke();
+            ctx.restore();
+        }
+
+        function drawSparks() {
+            for (let i = sparks.length - 1; i >= 0; i--) {
+                const p = sparks[i];
+                p.x += p.vx; p.y += p.vy; p.vy += .06; p.life -= p.decay;
+                if (p.life <= 0) { sparks.splice(i, 1); continue; }
+                ctx.save(); ctx.globalAlpha = p.life; ctx.fillStyle = p.col; ctx.shadowColor = p.col; ctx.shadowBlur = 8;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.sz * p.life, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+            }
+        }
+
+        function update() {
+            if (popOpen) return;
+            let dx = 0, dy = 0, moving = false;
+            if (keys['ArrowLeft'] || keys['a'] || keys['A']) dx -= 1;
+            if (keys['ArrowRight'] || keys['d'] || keys['D']) dx += 1;
+            if (keys['ArrowUp'] || keys['w'] || keys['W']) dy -= 1;
+            if (keys['ArrowDown'] || keys['s'] || keys['S']) dy += 1;
+            if (dx || dy) { target.x = null; target.y = null; moving = true; const l = Math.hypot(dx, dy); girl.vx = (dx / l) * 3.8; girl.vy = (dy / l) * 3.8; if (dx) girl.facing = dx > 0 ? 1 : -1; }
+            else if (target.x !== null) {
+                const cdx = target.x - girl.x, cdy = target.y - girl.y, cd = Math.hypot(cdx, cdy);
+                if (cd > 6) { moving = true; girl.vx = (cdx / cd) * 3.8; girl.vy = (cdy / cd) * 3.8; if (cdx) girl.facing = cdx > 0 ? 1 : -1; }
+                else { target.x = null; girl.vx = 0; girl.vy = 0; }
+            } else { girl.vx *= .78; girl.vy *= .78; }
+            if (moving) { girl.af += 1; girl.idle = 0; } else { girl.idle += 1; }
+            girl.x = Math.max(W * 0.03, Math.min(W * 0.97, girl.x + girl.vx));
+            girl.y = Math.max(H * 0.07, Math.min(H - H * 0.1, girl.y + girl.vy));
+        }
+
+        function loop() {
+            update();
+            ctx.clearRect(0, 0, W, H);
+            drawBg();
+            drawFloatParts();
+            [...objs].sort((a, b) => a.y - b.y).forEach(drawObj);
+            drawGirl(girl.x, girl.y, girl.facing, girl.af, girl.idle);
+            drawSparks();
+            t++;
+            requestAnimationFrame(loop);
+        }
+
+        loop();
+    </script>
+</body>
+</html>
